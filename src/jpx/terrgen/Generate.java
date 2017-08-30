@@ -14,7 +14,7 @@ public class Generate {
 		//side length, 
 		//and number of vertices per side length
 		float side = 600f;
-		int vsize = 64;
+		int vsize = 32;
 		
 		Vec3 originA = new Vec3( -side/2, -side/2, -side/2 );
 		Vec3 originB = new Vec3( +side/2, +side/2, +side/2 );
@@ -129,7 +129,7 @@ public class Generate {
 		
 		List<Tri> tris = new ArrayList<>();
 		//   (a)-----(d)
-		//	  | \     |
+		//    | \     |
 		//    |   \   |
 		//    |     \ |
 		//   (b)-----(c)
