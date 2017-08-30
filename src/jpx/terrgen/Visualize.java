@@ -112,13 +112,20 @@ public class Visualize extends JFrame {
 			for(Vec3 v:vlist) {
 				int x = (int) (v.x + halfwidth);
 				int y = (int) (v.y + halfheight);	
+				
 				float c = (v.z + abszmax)/(2*abszmax);
+				c = clamp(0f,c,1f);
 				
 				g.setColor(new Color( c,c,c ));
 				g.fillOval(x-2, y-2, 4, 4); 
 			}
 			g.dispose();
 			image = buf;
+		}
+
+
+		private float clamp(float min, float val, float max) {
+			return Math.min(max, Math.max(min, val));
 		}
 
 
