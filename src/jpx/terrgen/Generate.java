@@ -76,6 +76,9 @@ public class Generate {
 		//transform our vertices into a sphere!
 		List<Vec3> sphereVerts = MapCubeToSphere(side, cubeVerts);
 		
+		//add noise to the sphere surface
+		applyNoise(sphereVerts);
+		
 		//take a look!
 		if(!COMBINE) {
 			
@@ -96,7 +99,7 @@ public class Generate {
 		System.out.println("triangle count: " + 6*tris.size() );
 		
 	} 
-	
+
 
 	public static List<Vec3> GenerateVerticies(float sideLength, int vcount, Vec3 origin, Vec3 axisH, Vec3 axisV){
 		long start = System.currentTimeMillis();
@@ -182,6 +185,14 @@ public class Generate {
 			indices.add( t.c + index_offset );
 		}
 		return indices;
+	}
+	
+	
+	private static void applyNoise(List<Vec3> verts) {
+		for(Vec3 v:verts) {
+			Vec3 normal = v.normalized();//assumes sphere is centered at (0,0,0).  
+			v.set( Vec3.add(v, Vec3.mul(normal, (float) (16*Math.sin(v.x/20) + 16*Math.cos((v.y)/10) + 8*Math.sin((v.z)/5))) )); 
+		}
 	}
 
 
