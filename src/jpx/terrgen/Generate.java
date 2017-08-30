@@ -24,176 +24,242 @@ SOFTWARE.
 
 package jpx.terrgen;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class Generate {
 
-	// set to true to combine cube and sphere vertices into 
-	// a single visualization. 
-	private static final boolean COMBINE = false; 
-
+	
 	public static void main(String[] args) {
 		
-		//side length, 
-		//and number of vertices per side length
-		float side = 600f;
-		int vsize = 32;
+		float radius = 300;
+		int chunksPerEdge = 4;
+		int verticesPerChunkEdge = 8;
 		
-		Vec3 originA = new Vec3( -side/2, -side/2, -side/2 );
-		Vec3 originB = new Vec3( +side/2, +side/2, +side/2 );
-
-		// generate vertices: 6 planes of the cube
-		// > the three planes touching originA (-1,-1,-1)
-		List<Vec3> planeA = GenerateVerticies(side, vsize, originA, new Vec3( 1, 0, 0), new Vec3( 0, 1, 0)); // x.y
-		List<Vec3> planeB = GenerateVerticies(side, vsize, originA, new Vec3( 0, 0, 1), new Vec3( 0, 1, 0)); // z.y
-		List<Vec3> planeC = GenerateVerticies(side, vsize, originA, new Vec3( 1, 0, 0), new Vec3( 0, 0, 1)); // x.z
-
-		// > the three planes touching originB (+1,+1,+1)
-		List<Vec3> planeD = GenerateVerticies(side, vsize, originB, new Vec3(-1, 0, 0), new Vec3( 0,-1, 0)); // -x-y
-		List<Vec3> planeE = GenerateVerticies(side, vsize, originB, new Vec3( 0, 0,-1), new Vec3( 0,-1, 0)); // -z-y
-		List<Vec3> planeF = GenerateVerticies(side, vsize, originB, new Vec3(-1, 0, 0), new Vec3( 0, 0,-1)); // -x-z
+		Terrain world = Generate.SphericalTerrain(radius, chunksPerEdge, verticesPerChunkEdge);		
+		Terrain plane = Generate.PlanarTerrain(chunksPerEdge, radius/chunksPerEdge, verticesPerChunkEdge, new Vec3(0,0,0), new Vec3(1,0,0), new Vec3(0,0,1));
 		
-		List<Vec3> cubeVerts = new ArrayList<>();
-		cubeVerts.addAll(planeA); 
-		cubeVerts.addAll(planeB); 
-		cubeVerts.addAll(planeC); 
-		cubeVerts.addAll(planeD); 
-		cubeVerts.addAll(planeE); 
-		cubeVerts.addAll(planeF); 
 		
-		// construct indices array
-		List<Tri> tris = GenerateTris(vsize);
-		List<Integer> vindices = new ArrayList<>(6*3*tris.size());
+		NoiseFunc noiseFunc = (x,y,z)->{
+			return (float)(  20*Math.cos(x/20) + 10*Math.sin(y/10) + 5*Math.cos(z/5)  );
+		};
+		Generate.applyRadialNoise(world, noiseFunc);
 		
-		//the indices are identical for each plane, but since the plane's vertices 
-		//have been appended, the indices need an offset. 
-		for( int index_offset = 0, plane=0; plane<6; plane++, index_offset+=planeA.size() ) {
-			vindices.addAll( toIndices( tris, index_offset ) );
-		}
+		Vec3 axis = new Vec3(0,1,0);
+		Generate.applyAxialNoise(plane, axis, noiseFunc);
 		
-			
-		//transform our vertices into a sphere!
-		List<Vec3> sphereVerts = MapCubeToSphere(side, cubeVerts);
-		
-		//add noise to the sphere surface
-		applyNoise(sphereVerts);
-		
-		//take a look!
-		if(!COMBINE) {
-			
-			new Visualize(cubeVerts);
-			new Visualize(sphereVerts);
-			
-		} else {
-			
-			List<Vec3> allVerts = new ArrayList<>();
-			allVerts.addAll(sphereVerts);
-			allVerts.addAll(cubeVerts);
-			new Visualize(allVerts);
-			
-		}
-		
-		System.out.println("index count: " + vindices.size() );
-		System.out.println("vertex count: " + cubeVerts.size() );
-		System.out.println("triangle count: " + 6*tris.size() );
-		
+		new Visualize(world);
+		new Visualize(plane);
 	} 
 
 
-	public static List<Vec3> GenerateVerticies(float sideLength, int vcount, Vec3 origin, Vec3 axisH, Vec3 axisV){
-		long start = System.currentTimeMillis();
+	public static Terrain SphericalTerrain(float radius, int chunksPerEdge, int chunkEdgeVertexCount) {
+		Terrain world = new Terrain();
+		world.chunks = new TerrChunk[ 6*chunksPerEdge*chunksPerEdge ];
 		
-		List<Vec3> vertices = new ArrayList<>();
+		int cp = 0;
+		Terrain tmp;
+		Vec3 corner, axisH, axisV;
+		float chunklength = 2f/chunksPerEdge;
+		
+		//three faces from first corner
+		corner = new Vec3(-1,-1,-1);
+		
+		// X,Y
+		axisH = new Vec3(1,0,0);
+		axisV = new Vec3(0,1,0);
+		tmp = Generate.PlanarTerrain(chunksPerEdge, chunklength, chunkEdgeVertexCount, corner, axisH, axisV );
+		for( TerrChunk chunk: tmp.chunks ) {
+			world.chunks[cp++] = chunk;
+		}
+		
+		// Y,Z
+		axisH = new Vec3(0,0,1);
+		axisV = new Vec3(0,1,0);
+		tmp = Generate.PlanarTerrain(chunksPerEdge, chunklength, chunkEdgeVertexCount, corner, axisH, axisV );
+		for( TerrChunk chunk: tmp.chunks ) {
+			world.chunks[cp++] = chunk;
+		}
+		
+		// X,Z
+		axisH = new Vec3(1,0,0);
+		axisV = new Vec3(0,0,1);
+		tmp = Generate.PlanarTerrain(chunksPerEdge, chunklength, chunkEdgeVertexCount, corner, axisH, axisV );
+		for( TerrChunk chunk: tmp.chunks ) {
+			world.chunks[cp++] = chunk;
+		}
+		
+		//three faces from opposite corner
+		corner = new Vec3(+1,+1,+1);
+		
+		// X,Y
+		axisH = new Vec3(-1,0,0);
+		axisV = new Vec3(0,-1,0);
+		tmp = Generate.PlanarTerrain(chunksPerEdge, chunklength, chunkEdgeVertexCount, corner, axisH, axisV );
+		for( TerrChunk chunk: tmp.chunks ) {
+			world.chunks[cp++] = chunk;
+		}
+		
+		// Y,Z
+		axisH = new Vec3(0,0,-1);
+		axisV = new Vec3(0,-1,0);
+		tmp = Generate.PlanarTerrain(chunksPerEdge, chunklength, chunkEdgeVertexCount, corner, axisH, axisV );
+		for( TerrChunk chunk: tmp.chunks ) {
+			world.chunks[cp++] = chunk;
+		}
+		
+		// X,Z
+		axisH = new Vec3(-1,0,0);
+		axisV = new Vec3(0,0,-1);
+		tmp = Generate.PlanarTerrain(chunksPerEdge, chunklength, chunkEdgeVertexCount, corner, axisH, axisV );
+		for( TerrChunk chunk: tmp.chunks ) {
+			world.chunks[cp++] = chunk;
+		}
+		
+		//map unit cube to unit sphere and then scale to radius
+		//http://mathproofs.blogspot.ca/2005/07/mapping-cube-to-sphere.html
+		for(TerrChunk chunk:world.chunks) {
+			for( int i=0; i<chunk.vertices.length; i+=3 ) {
+				
+				float ux = chunk.vertices[i+0];
+				float uy = chunk.vertices[i+1];
+				float uz = chunk.vertices[i+2];
+				
+				float x = (float) (ux * Math.sqrt(1 - (uy*uy/2) - (uz*uz/2) + (uy*uy*uz*uz/3)));
+				float y = (float) (uy * Math.sqrt(1 - (uz*uz/2) - (ux*ux/2) + (uz*uz*ux*ux/3)));
+				float z = (float) (uz * Math.sqrt(1 - (ux*ux/2) - (uy*uy/2) + (ux*ux*uy*uy/3)));
+				
+				Vec3 vert = new Vec3(x,y,z).scale(radius);
+				chunk.vertices[i+0] = vert.x;
+				chunk.vertices[i+1] = vert.y;
+				chunk.vertices[i+2] = vert.z;
+			}
+			chunk.centroid.scale(radius);
+		}
+		
+		return world;
+	}
+	
+	public static Terrain PlanarTerrain(int chunksPerEdge, float chunkEdgeLength, int chunkEdgeVertexCount, Vec3 origin, Vec3 axisH, Vec3 axisV) {
+		Terrain terrain = new Terrain();
+		
+		int n = chunksPerEdge;
+		terrain.chunks = new TerrChunk[ n*n ];
+		
+		int cp = 0;
+		for(int i=0; i<n; ++i) {
+			for(int j=0; j<n; ++j) {
+				Vec3 chunkOrigin = Vec3.add(origin, Vec3.add(Vec3.mul(axisH, i*chunkEdgeLength), Vec3.mul(axisV, j*chunkEdgeLength)));
+				terrain.chunks[cp++] = GenerateTerrainChunk(
+						chunkEdgeLength, 
+						chunkEdgeVertexCount, 
+						chunkOrigin, axisH, axisV);
+			}
+		}
+		return terrain;
+	}
+	
+	private static TerrChunk GenerateTerrainChunk(float sideLength, int vcount, Vec3 origin, Vec3 axisH, Vec3 axisV) {
+		TerrChunk chunk = new TerrChunk();
+		
+		chunk.sideLength = sideLength;
+		chunk.centroid = Vec3.add( origin , Vec3.add( Vec3.mul(axisV, 0.50f*sideLength), Vec3.mul(axisH, 0.50f*sideLength)));
+		
+		int n = vcount*vcount;
+		chunk.vertices = new float[3*n];
+		chunk.texcoord = new float[2*n]; 
+		chunk.indices = new int[ 3*( 2*(n-1)*(n-1) ) ]; 
+		
 		float step = sideLength/(vcount-1);
+		float invL = 1f/sideLength;
+		int vp = 0;
+		int tp = 0;
+		int ip = 0;
 		
+		//     vert pos      tex coord        indices   
+		//   (0)-----(1)    (0,0)--(1,0)    (a)-----(d)
+		//    | \     |      |  \    |       | \     |
+		//    |   \   |      |   \   |       |   \   |
+		//    |     \ |      |    \  |       |     \ |
+		//   (2)-----(3)    (0,1)--(1,1)    (b)-----(c)
+		
+		//vertex positions
 		for(float v=0, i=0; i<vcount; v+=step, ++i) {
 			for(float h=0, j=0; j<vcount; h+=step, ++j) {
-				Vec3 vpointer = Vec3.add(origin, Vec3.add( Vec3.mul(axisH,h) , Vec3.mul(axisV,v)) );
-				vertices.add( vpointer );
+				Vec3 vert = Vec3.add(origin, Vec3.add( Vec3.mul(axisH,h) , Vec3.mul(axisV,v)) );
+				chunk.vertices[vp++] = vert.x;
+				chunk.vertices[vp++] = vert.y;
+				chunk.vertices[vp++] = vert.z;
 			}
 		}
 		
-		long dur = System.currentTimeMillis() - start;
-		System.out.println("GenerateVerticies: " + ((double)dur)/1000 + "s");
-		
-		return vertices;
-	}
-	
-	// http://mathproofs.blogspot.ca/2005/07/mapping-cube-to-sphere.html
-	public static List<Vec3> MapCubeToSphere(float cubeSideLength, List<Vec3> inVerts){
-		long start = System.currentTimeMillis();
-		
-		List<Vec3> outVerts = new ArrayList<>();
-		float toUnit = 2f/cubeSideLength;
-		float toFullsize = 1f/toUnit;
-		
-		for( Vec3 v:inVerts ) {
-			
-			//scale to unit cube (sides of -1 to +1)
-			//for transform to work correctly
-			float ux = v.x*toUnit;
-			float uy = v.y*toUnit;
-			float uz = v.z*toUnit;
-			
-			float x = (float) (ux * Math.sqrt(1 - (uy*uy/2) - (uz*uz/2) + (uy*uy*uz*uz/3)));
-			float y = (float) (uy * Math.sqrt(1 - (uz*uz/2) - (ux*ux/2) + (uz*uz*ux*ux/3)));
-			float z = (float) (uz * Math.sqrt(1 - (ux*ux/2) - (uy*uy/2) + (ux*ux*uy*uy/3)));
-			
-			//scale back up to full size
-			outVerts.add(new Vec3(x, y, z).scale(toFullsize));
+		//texture coordinates
+		for(float v=0, i=0; i<vcount; v+=step, ++i) {
+			for(float h=0, j=0; j<vcount; h+=step, ++j) {
+				chunk.texcoord[tp++] = h*invL;
+				chunk.texcoord[tp++] = v*invL;
+			}
 		}
 		
-		long dur = System.currentTimeMillis() - start;
-		System.out.println("MapCubeToSphere: " + ((double)dur)/1000 + "s");
-		
-		return outVerts;
-	}
-	
-	
-	public static List<Tri> GenerateTris(int vsize) {
-		long start = System.currentTimeMillis();
-		
-		List<Tri> tris = new ArrayList<>();
-		//   (a)-----(d)
-		//    | \     |
-		//    |   \   |
-		//    |     \ |
-		//   (b)-----(c)
-		for(int v = 0; v<vsize-1; ++v) {
-			for(int h = 0; h<vsize-1; ++h) {
-				int a = v*vsize+h;
-				int b = a+vsize;
+		//indices
+		for(int v = 0; v<vcount-1; ++v) {
+			for(int h = 0; h<vcount-1; ++h) {
+				int a = v*vcount+h;
+				int b = a+vcount;
 				int c = b+1;
 				int d = a+1;
-				tris.add(new Tri(a,b,c));
-				tris.add(new Tri(c,d,a));
+				
+				//triangle 1
+				chunk.indices[ip++] = a;
+				chunk.indices[ip++] = b;
+				chunk.indices[ip++] = c;
+				
+				//triangle 2
+				chunk.indices[ip++] = c;
+				chunk.indices[ip++] = d;
+				chunk.indices[ip++] = a;
 			}
 		}
-		long dur = System.currentTimeMillis() - start;
-		System.out.println("generate tris: " + ((double)dur)/1000 + "s");
 		
-		return tris;
-	}
+		return chunk;
+	}	
 	
 	
-	public static List<Integer> toIndices(List<Tri> tris, int index_offset) { 
-		List<Integer> indices = new ArrayList<>(3*tris.size());
-		for( Tri t:tris ) {
-			indices.add( t.a + index_offset );
-			indices.add( t.b + index_offset );
-			indices.add( t.c + index_offset );
+	private static void applyRadialNoise(Terrain world, NoiseFunc noiseFunc) {
+		for(TerrChunk chunk:world.chunks) {
+			for(int i=0; i<chunk.vertices.length; i+=3) {
+				
+				float x = chunk.vertices[i+0];
+				float y = chunk.vertices[i+1];
+				float z = chunk.vertices[i+2];
+				
+				Vec3 vert = new Vec3(x,y,z);	
+				Vec3 axis = vert.normalized();
+				vert = Vec3.add(vert, Vec3.mul(axis, noiseFunc.apply(x, y, z))); 
+				
+				chunk.vertices[i+0] = vert.x;
+				chunk.vertices[i+1] = vert.y;
+				chunk.vertices[i+2] = vert.z;
+			}
 		}
-		return indices;
 	}
 	
 	
-	private static void applyNoise(List<Vec3> verts) {
-		for(Vec3 v:verts) {
-			Vec3 normal = v.normalized();//assumes sphere is centered at (0,0,0).  
-			v.set( Vec3.add(v, Vec3.mul(normal, (float) (16*Math.sin(v.x/20) + 16*Math.cos((v.y)/10) + 8*Math.sin((v.z)/5))) )); 
+	private static void applyAxialNoise(Terrain plane, Vec3 axis, NoiseFunc noiseFunc) {
+		axis = axis.normalized();
+		for(TerrChunk chunk:plane.chunks) {
+			for(int i=0; i<chunk.vertices.length; i+=3) {
+				
+				float x = chunk.vertices[i+0];
+				float y = chunk.vertices[i+1];
+				float z = chunk.vertices[i+2];
+				
+				Vec3 vert = new Vec3(x,y,z);	
+				vert = Vec3.add(vert, Vec3.mul(axis, noiseFunc.apply(x, y, z))); 
+				
+				chunk.vertices[i+0] = vert.x;
+				chunk.vertices[i+1] = vert.y;
+				chunk.vertices[i+2] = vert.z;
+			}
 		}
 	}
-
+	
 
 }

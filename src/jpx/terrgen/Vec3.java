@@ -67,6 +67,10 @@ public class Vec3 {
 		ret.z *= f;
 		return ret;
 	}
+	
+	public static float dot(Vec3 a, Vec3 b) {
+		return (a.x*b.x) + (a.y*b.y) + (a.z+b.z);
+	}
 
 	@Override
 	public int hashCode() {
@@ -95,6 +99,8 @@ public class Vec3 {
 			return false;
 		return true;
 	}
+
+	
 
 	
 	
