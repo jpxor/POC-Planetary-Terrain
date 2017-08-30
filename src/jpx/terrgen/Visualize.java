@@ -61,7 +61,6 @@ public class Visualize extends JFrame {
 	
 	private class VizComponent extends JPanel {
 		
-		private float absxymax;
 		private List<Vec3> vlist;
 		private BufferedImage image;
 		private Rotation rotation = new Rotation(new Vec3(0,1,1), 0.005f); 
@@ -76,19 +75,6 @@ public class Visualize extends JFrame {
 			g.fillRect(0, 0, dim.width, dim.height);
 			g.dispose();
 			
-			//Max XY value is used to scale vertices to fit the screen,
-			//This is only calculated once to stop the scale from changing
-			//when XY max changes. 
-			absxymax = 0;
-			for(Vec3 v:vlist) {
-				if( absxymax < Math.abs(v.x) ) {
-					absxymax = Math.abs(v.x);
-				}
-				if( absxymax < Math.abs(v.y) ) {
-					absxymax = Math.abs(v.y); 
-				}
-			}
-			absxymax+=1f;
 		}
 		
 		
