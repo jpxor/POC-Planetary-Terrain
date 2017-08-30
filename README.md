@@ -1,5 +1,5 @@
-# PlanetaryTerrainTest
-- Algorithms for generating terrain chunks, and mapping them onto a sphere (Generate.java). 
+# Planetary Terrain Algorithms
+- Generating flat terrain chunks with arbitrary position and rotation, and mapping them onto a sphere (Generate.java). 
 - VertexViz (Visualize.java) for viewing lists of vertices (100% java, no extra libraries needed). 
 - Rotation matrix implementation (Rotation.java). 
 
